@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart ECG Monitoring System Presentation</title>
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Design Tokens & Theme variables */
+    :root {
+      --bg-dark: #f8fafc;
+      --bg-card: rgba(255, 255, 255, 0.85);
+      --border-color: rgba(148, 163, 184, 0.25);
+      
+      --color-primary: #0284c7; /* Sky Blue */
+      --color-secondary: #0d9488; /* Teal */
+      --color-accent: #10b981; /* Green */
+      --color-warning: #d97706; /* Amber */
+      --color-danger: #db2777; /* Magenta */
+      
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --font-header: 'Outfit', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    /* Background animated canvas */
+    #bg-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    /* Presentation Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 3rem;
+      z-index: 10;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(248, 250, 252, 0.85);
+      backdrop-filter: blur(10px);
+    }
+
+    .project-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-header);
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: 0.5px;
+      color: var(--text-main);
+    }
+
+    .badge-icon {
+      color: var(--color-primary);
+      animation: pulse 1.5s infinite;
+      font-size: 1.5rem;
+    }
+
+    .slide-progress-header {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      background: rgba(15, 23, 42, 0.04);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+    }
+
+    /* Slides Container */
+    .slides-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 3rem;
+    }
+
+    /* Slide Card */
+    .slide {
+      position: absolute;
+      width: 90%;
+      max-width: 1100px;
+      height: 75vh;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 3rem;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.05);
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transform: translateY(30px) scale(0.98);
+      pointer-events: none;
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 2;
+    }
+
+    .slide.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+      z-index: 3;
+    }
+
+    /* Slide Grid Layouts */
+    .slide-layout-split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 2.5rem;
+      flex: 1;
+      min-height: 0; /* allows flex item to shrink below content */
+    }
+
+    .slide-layout-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      flex: 1;
+    }
+
+    /* Title Slide Custom Elements */
+    .main-title {
+      font-family: var(--font-header);
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.5rem;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .sub-title {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      max-width: 700px;
+      margin-bottom: 2.5rem;
+      line-height: 1.6;
+    }
+
+    .title-meta {
+      display: flex;
+      gap: 3rem;
+      margin-top: 1rem;
+      font-size: 0.95rem;
+    }
+
+    .meta-group {
+      text-align: left;
+    }
+
+    .meta-label {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-val {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Slide Heading */
+    .slide-title-area {
+      margin-bottom: 1.5rem;
+    }
+
+    .slide-number {
+      font-family: var(--font-mono);
+      color: var(--color-primary);
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .slide-title {
+      font-family: var(--font-header);
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Scrollable Slide Content */
+    .slide-body {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    /* Custom scrollbar for slide body */
+    .slide-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .slide-body::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 9999px;
+    }
+    .slide-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+    }
+
+    /* Styled Bullet Lists */
+    ul.slide-list {
+      list-style: none;
+    }
+
+    ul.slide-list li {
+      position: relative;
+      padding-left: 2rem;
+      margin-bottom: 1.25rem;
+    }
+
+    ul.slide-list li::before {
+      content: "➔";
+      position: absolute;
+      left: 0;
+      top: 0.15rem;
+      color: var(--color-primary);
+      font-weight: bold;
+    }
+
+    ul.slide-list li strong {
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    /* Highlight box / Card */
+    .highlight-card {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 4px solid var(--color-secondary);
+      padding: 1.25rem;
+      border-radius: 0 12px 12px 0;
+      margin: 1.5rem 0;
+    }
+
+    /* Graphic panels */
+    .slide-graphic {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      height: 100%;
+      min-height: 300px;
+    }
+
+    .slide-graphic img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      padding: 1rem;
+      transition: transform 0.5s ease;
+    }
+
+    .slide-graphic:hover img {
+      transform: scale(1.03);
+    }
+
+    .graphic-label {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      color: var(--color-accent);
+      backdrop-filter: blur(4px);
+    }
+
+    /* Custom Table styling */
+    table.slide-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.95rem;
+    }
+
+    table.slide-table th {
+      background: rgba(79, 172, 254, 0.1);
+      border-bottom: 2px solid rgba(79, 172, 254, 0.3);
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-family: var(--font-header);
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+
+    table.slide-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    table.slide-table tr:hover {
+      background: rgba(15, 23, 42, 0.02);
+    }
+
+    /* Equation Block */
+    .equation-block {
+      background: rgba(15, 23, 42, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      position: relative;
+    }
+
+    .eq-label {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.75rem;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .math-expr {
+      color: var(--color-accent);
+      font-weight: bold;
+    }
+
+    /* Navigation Controls Footer */
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 3rem;
+      z-index: 10;
+      border-top: 1px solid var(--border-color);
+      background: rgba(248, 250, 252, 0.85);
+      backdrop-filter: blur(10px);
+    }
+
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .nav-btn {
+      background: rgba(15, 23, 42, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-family: var(--font-header);
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      outline: none;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 15px rgba(2, 132, 199, 0.4);
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .slide-dots {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.15);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .dot.active {
+      background: var(--color-primary);
+      transform: scale(1.3);
+      box-shadow: 0 0 8px var(--color-primary);
+    }
+
+    /* Key animations */
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 2px var(--color-primary));
+      }
+      50% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 8px var(--color-primary));
+      }
+    }
+
+    /* Responsive scaling for display */
+    @media (max-height: 800px) {
+      .slide {
+        height: 80vh;
+        padding: 2rem;
+      }
+      .main-title {
+        font-size: 2.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Glowing Real-time ECG Sweep Canvas -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Presentation Header -->
+  <header>
+    <div class="project-badge">
+      <span class="badge-icon">❤</span>
+      <span>SMART ECG SYSTEM</span>
+    </div>
+    <div class="slide-progress-header" id="progress-text">SLIDE 01 / 10</div>
+  </header>
+
+  <!-- Slides Container -->
+  <main class="slides-container">
+
+    <!-- SLIDE 1: TITLE SLIDE -->
+    <div class="slide active" data-slide-idx="1">
+      <div class="slide-layout-center">
+        <span class="slide-number">PROJECT PRESENTATION</span>
+        <h1 class="main-title">Smart ECG Monitoring System</h1>
+        <p class="sub-title">Real-time cardiovascular telemetry utilizing an ESP32 microcontroller, digital IIR filtering, and an interactive Web Serial visualizer suite.</p>
+        
+        <div class="highlight-card" style="width: 100%; max-width: 600px; margin: 0 auto 2rem; border-left-color: var(--color-accent);">
+          <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-accent); letter-spacing: 1px; display: block; margin-bottom: 0.25rem;">PROJECT HIGHLIGHT</span>
+          Dual-core digital signal processing at 100 Hz, local OLED display representation, BLE wireless advertisement, and zero-installation Web Serial desktop software.
+        </div>
+
+        <div class="title-meta">
+          <div class="meta-group">
+            <p class="meta-label">Team Members</p>
+            <p class="meta-val">Name 1, Name 2, Name 3</p>
+          </div>
+          <div class="meta-group">
+            <p class="meta-label">Department / Institution</p>
+            <p class="meta-val">Electronics & Communication Engineering</p>
+          </div>
+          <div class="meta-group">
+            <p class="meta-label">Technical Stack</p>
+            <p class="meta-val">ESP32, AD8232, OLED I2C, Web Serial, BLE</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: INTRODUCTION & PROBLEM STATEMENT -->
+    <div class="slide" data-slide-idx="2">
+      <div class="slide-layout-split">
+        <div>
+          <span class="slide-number">02 // CONTEXT</span>
+          <h2 class="slide-title">Introduction & Motivation</h2>
+          <div class="slide-body" style="margin-top: 1.5rem;">
+            <ul class="slide-list">
+              <li><strong>Cardiovascular Health:</strong> Early warning systems for heart conditions like arrhythmia require continuous, comfortable bio-potential tracking.</li>
+              <li><strong>Mains Line Noise (50Hz/60Hz):</strong> Ambient electrical cabling emits electromagnetic fields that induce a massive signal noise over dry/wet electrode pads, drowning clinical ECG waves.</li>
+              <li><strong>Baseline Wander:</strong> Low-frequency interference (from chest expansion during inhalation/exhalation or posture shifts) displaces signals vertically, making peak extraction impossible.</li>
+              <li><strong>Traditional Hardware Limits:</strong> Medical-grade recorders are expensive, wired, and lack web portal capabilities for wireless digital tele-health.</li>
+            </ul>
+            <div class="highlight-card">
+              <strong>Core Objective:</strong> Create a portable, low-cost wearable monitor that performs dynamic noise removal on-chip, reports diagnostics on a physical screen, and feeds diagnostic data directly to a web browser via Web Serial.
+            </div>
+          </div>
+        </div>
+        <div class="slide-graphic">
+          <!-- Slide Graphic Placeholder -->
+          <div style="text-align: center; padding: 2rem;">
+            <div style="font-size: 4rem; color: var(--color-primary); margin-bottom: 1rem;">🫀</div>
+            <h3 style="font-family: var(--font-header); font-size: 1.5rem; margin-bottom: 0.5rem;">Real-time Telemetry</h3>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Bridging hardware DSP filters and medical interface grids for reliable portable diagnostics.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: SYSTEM ARCHITECTURE -->
+    <div class="slide" data-slide-idx="3">
+      <div class="slide-layout-split">
+        <div>
+          <span class="slide-number">03 // HARDWARE TOPOLOGY</span>
+          <h2 class="slide-title">System Architecture</h2>
+          <div class="slide-body" style="margin-top: 1.5rem;">
+            <p style="margin-bottom: 1rem; color: var(--text-muted);">The architectural layout splits processing blocks into analog front-end conditioning, digital computing, and dual-layer output networks:</p>
+            <ul class="slide-list">
+              <li><strong>Transduction Block:</strong> Silver-chloride (Ag-AgCl) biomedical skin electrodes capture potential changes across the cardiac muscle.</li>
+              <li><strong>Analog Front End (AD8232):</strong> Amplifies weak signals ($G \approx 100$) and performs analog band-pass filtering to reject common-mode signals.</li>
+              <li><strong>Digital Conditioning Block:</strong> The ESP32 micro-controller samples the ADC lines, feeds data to sequential filter structures (DSP), and executes QRS threshold routines.</li>
+              <li><strong>Double-Output System:</strong> Telemetry is outputted locally to a 1.3" OLED and transmitted to external dashboard platforms using USB-UART serial and Bluetooth Low Energy (BLE) channels.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="slide-graphic">
+          <img src="images/system_architecture.png" alt="System Block Diagram">
+          <span class="graphic-label">System Block Diagram</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: WIRING AND PIN CONNECTIONS -->
+    <div class="slide" data-slide-idx="4">
+      <div class="slide-layout-center">
+        <span class="slide-number">04 // SCHEMATIC SCHEDULING</span>
+        <h2 class="slide-title" style="margin-bottom: 1rem;">Hardware Connection Interface</h2>
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">The layout integrates the ESP32 development module with peripheral sensors, screens, and diagnostic beepers via specific GPIO interfaces:</p>
+        
+        <table class="slide-table">
+          <thead>
+            <tr>
+              <th>Peripherals</th>
+              <th>Peripheral Pin</th>
+              <th>ESP32 GPIO Pin</th>
+              <th>Signal Type</th>
+              <th>Operational Intent</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:600;">AD8232 ECG Module</td>
+              <td>OUTPUT</td>
+              <td style="font-family: var(--font-mono); color: var(--color-accent);">GPIO 34 (ADC1_CH6)</td>
+              <td>Analog In</td>
+              <td>Continuous ADC sampling of raw cardiac potential</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">AD8232 ECG Module</td>
+              <td>LO+ / LO-</td>
+              <td style="font-family: var(--font-mono);">GPIO 33 / GPIO 32</td>
+              <td>Digital Input</td>
+              <td>Lead off detection (Hysteresis-debounced)</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">1.3" OLED Display</td>
+              <td>SDA / SCL</td>
+              <td style="font-family: var(--font-mono); color: var(--color-primary);">GPIO 21 / GPIO 22</td>
+              <td>I2C Data/Clock</td>
+              <td>Plots waveform and prints BPM via U8g2 library (400kHz clock)</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Buzzer Alarm</td>
+              <td>Positive (+)</td>
+              <td style="font-family: var(--font-mono);">GPIO 25</td>
+              <td>Digital Output</td>
+              <td>Pulse click sound and audible alarms (Optional/Disabled)</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600;">Buzzer Alarm</td>
+              <td>Negative (-)</td>
+              <td style="font-family: var(--font-mono);">GND</td>
+              <td>Common Ground</td>
+              <td>Return path for audio buzzer signal</td>
+            </tr>
+
+            <tr>
+              <td style="font-weight:600;">Power Bus</td>
+              <td>VCC / GND</td>
+              <td style="font-family: var(--font-mono);">3.3V / GND</td>
+              <td>Power DC</td>
+              <td>Operating voltage for digital ICs and ECG IC</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="highlight-card" style="width: 100%; margin-top: 1.5rem; padding: 0.8rem 1.2rem;">
+          <strong>Design Note:</strong> The AD8232 operates strictly at 3.3V logic. Powering the chip via 5V rails will damage the internal logic gates of the ESP32 ADC pin.
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: ELECTRODE PLACEMENT -->
+    <div class="slide" data-slide-idx="5">
+      <div class="slide-layout-split">
+        <div>
+          <span class="slide-number">05 // MEDICAL INTERFACING</span>
+          <h2 class="slide-title">Lead Placement & Einthoven's Triangle</h2>
+          <div class="slide-body" style="margin-top: 1.5rem;">
+            <p style="margin-bottom: 1rem; color: var(--text-muted);">Standard clinical records utilize three biological electrodes forming an imaginary triangle over the chest to trace electrical vectors:</p>
+            <ul class="slide-list">
+              <li><strong>Red Electrode (RA - Right Arm):</strong> Attached to the upper right quadrant of the chest, immediately under the collarbone. Serves as the negative input.</li>
+              <li><strong>Yellow Electrode (LA - Left Arm):</strong> Attached to the upper left quadrant of the chest, under the left collarbone. Serves as the positive input.</li>
+              <li><strong>Green Electrode (RL - Right Leg):</strong> Placed over the lower left quadrant of the abdomen. Serves as the system ground reference (common-mode feedback).</li>
+              <li><strong>Einthoven Lead II Configuration:</strong> Emitted potential vector points from Right Arm (-) to Right Leg (+), maximizing the visibility of the primary R-wave.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="slide-graphic">
+          <img src="images/electrode_placement.png" alt="Torso Electrode Placement">
+          <span class="graphic-label">Einthoven's Triangle configuration</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: DSP FILTER PIPELINE -->
+    <div class="slide" data-slide-idx="6">
+      <div class="slide-body">
+        <span class="slide-number">06 // SIGNAL FILTERING</span>
+        <h2 class="slide-title" style="margin-bottom: 1rem;">Digital Signal Processing (DSP) Pipeline</h2>
+        
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">The sampled signal passes through three sequential real-time digital filtering blocks on-chip:</p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+          <!-- HP Filter -->
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+            <h3 style="color: var(--color-primary); font-size: 1.1rem; margin-bottom: 0.5rem;">1. High-Pass DC Blocker</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Removes baseline drift caused by patient respiration and movement.</p>
+            <div class="equation-block">
+              <span class="eq-label">Difference Eq</span>
+              <span class="math-expr">y[n] = x[n] - x[n-1] + &alpha;&middot;y[n-1]</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">&alpha; = 0.98, Cutoff &approx; 0.5 Hz.</p>
+          </div>
+
+          <!-- Notch Filter -->
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+            <h3 style="color: var(--color-accent); font-size: 1.1rem; margin-bottom: 0.5rem;">2. 50Hz Notch Filter</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Suppresses electromagnetic grid hum from AC power cabling (50Hz).</p>
+            <div class="equation-block">
+              <span class="eq-label">IIR Notch Difference Eq</span>
+              <span class="math-expr" style="font-size: 0.85rem;">y[n] = x[n] + 2x[n-1] + x[n-2] - 2r&middot;y[n-1] - r<sup>2</sup>&middot;y[n-2]</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Sampling = 100Hz, r = 0.95.</p>
+          </div>
+
+          <!-- LP Filter -->
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+            <h3 style="color: var(--color-warning); font-size: 1.1rem; margin-bottom: 0.5rem;">3. Low-Pass EMA Filter</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Smooths out muscle tremors (electromyographic) and RF noise.</p>
+            <div class="equation-block">
+              <span class="eq-label">EMA Formula</span>
+              <span class="math-expr">y[n] = &beta;&middot;x[n] + (1-&beta;)&middot;y[n-1]</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">&beta; = 0.18, Cutoff &approx; 30 Hz.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: QRS PEAK DETECTION & BPM -->
+    <div class="slide" data-slide-idx="7">
+      <div class="slide-layout-split">
+        <div>
+          <span class="slide-number">07 // ARRHYTHMIA COMPUTATION</span>
+          <h2 class="slide-title">QRS Peak Detection & BPM</h2>
+          <div class="slide-body" style="margin-top: 1.5rem;">
+            <ul class="slide-list">
+              <li><strong>Ventricular Depolarization:</strong> The R-wave represents the highest amplitude event in a standard ECG complex.</li>
+              <li><strong>Decaying Adaptive Threshold:</strong> To prevent losing peaks due to changes in posture or skin contact, the threshold is computed dynamically:
+                <div class="equation-block" style="padding: 0.75rem; margin: 0.75rem 0; font-size: 1rem;">
+                  <span class="math-expr">Peak<sub>Decay</sub>: P<sub>val</sub> &leftarrow; P<sub>val</sub> &times; 0.996</span><br>
+                  <span class="math-expr">Threshold: T = P<sub>val</sub> &times; 0.60</span>
+                </div>
+              </li>
+              <li><strong>Refractory Lockout:</strong> Upon a successful detection, a 320ms lockout window prevents double-counting T-waves or secondary noise peaks.</li>
+              <li><strong>BPM Averaging:</strong> Re-calculates BPM using R-R peak intervals. A 5-point moving ring buffer stabilizes the output:
+                <div class="equation-block" style="padding: 0.5rem; margin: 0.75rem 0; font-size: 1rem; color: var(--color-primary);">
+                  <span class="math-expr">BPM = 60000 / (R-R Interval in ms)</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="slide-graphic">
+          <!-- Visual Heart beats -->
+          <div style="padding: 2rem; text-align: center;">
+            <div style="font-size: 3rem; color: var(--color-danger); animation: pulse 1s infinite; margin-bottom: 1rem;">❤</div>
+            <h3 style="font-family: var(--font-header); font-size: 1.5rem; margin-bottom: 0.5rem;">Adaptive Thresholding</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; max-width: 320px; margin: 0 auto;">Dynamic peaks are tracked in real-time, preventing flatlining or double-triggering anomalies.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: WEB VISUALIZER DASHBOARD -->
+    <div class="slide" data-slide-idx="8">
+      <div class="slide-layout-split">
+        <div>
+          <span class="slide-number">08 // DESKTOP SOFTWARE</span>
+          <h2 class="slide-title">Web Serial Diagnostics Suite</h2>
+          <div class="slide-body" style="margin-top: 1.5rem;">
+            <ul class="slide-list">
+              <li><strong>Zero Installation:</strong> Coded in pure HTML5/CSS3/JavaScript. Runs instantly when opening the file in Google Chrome, Microsoft Edge, or Opera.</li>
+              <li><strong>Web Serial API:</strong> Direct hardware read over COM USB port without intermediate backend servers (Node/Python).</li>
+              <li><strong>Double-Buffered Canvas:</strong> Draws a clean, glowing scrolling sweep of ECG streams at 60 frames per second.</li>
+              <li><strong>Multi-Channel Visualization:</strong> Allows toggling between Raw ADC signals, clean filtered waves, or a dual overlay mode to review filter effects.</li>
+              <li><strong>Simulated Demo Mode:</strong> Features a mathematical physiological cardiac wave synthesizer to test diagnostic alarms without hardware connected.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="slide-graphic">
+          <img src="images/web_dashboard_preview.png" alt="Web Visualizer UI Mockup">
+          <span class="graphic-label">Web Dashboard UI</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: RESULTS & VERIFICATION -->
+    <div class="slide" data-slide-idx="9">
+      <div class="slide-layout-split">
+        <div>
+          <span class="slide-number">09 // EMPIRICAL VALIDATION</span>
+          <h2 class="slide-title">Results & Future Scope</h2>
+          <div class="slide-body" style="margin-top: 1.5rem;">
+            <ul class="slide-list">
+              <li><strong>Filter Performance:</strong> Digital filtering blocks attenuate 50Hz hum and center ECG waves, outputting clinical-grade waveforms.</li>
+              <li><strong>Autoscale & Peak tracking:</strong> Screen maps auto-scale dynamically on the OLED, preserving wave details.</li>
+              <li><strong>Refractory validation:</strong> Ignored secondary waves and muscle tremor artifacts cleanly.</li>
+            </ul>
+            <div class="highlight-card">
+              <span style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-primary); letter-spacing: 1px; display: block; margin-bottom: 0.25rem;">FUTURE ENHANCEMENTS</span>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">1. Integrate Edge-AI models (TensorFlow Lite Micro) to detect Premature Ventricular Contractions (PVCs) and Atrial Fibrillation directly on the ESP32.</p>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">2. Connect Wi-Fi telemetry to cloud servers (Firebase/AWS) for continuous IoT monitoring.</p>
+            </div>
+          </div>
+        </div>
+        <div class="slide-graphic">
+          <div style="padding: 2rem; text-align: center;">
+            <div style="font-size: 4rem; color: var(--color-accent); margin-bottom: 1rem;">🏆</div>
+            <h3 style="font-family: var(--font-header); font-size: 1.3rem; margin-bottom: 0.5rem;">Project Accomplishments</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Clinical-grade signal extraction at a hardware budget under $15.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: REFERENCES & THANK YOU -->
+    <div class="slide" data-slide-idx="10">
+      <div class="slide-layout-center">
+        <span class="slide-number">10 // CONCLUSION</span>
+        <h1 class="main-title" style="font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Thank You!</h1>
+        <p class="sub-title" style="margin-bottom: 2rem;">Questions & Answers Session</p>
+        
+        <div style="display: flex; gap: 2rem; text-align: left; max-width: 800px; margin: 0 auto;">
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; flex: 1;">
+            <h3 style="font-family: var(--font-header); font-size: 1.1rem; color: var(--color-primary); margin-bottom: 0.5rem;">Core References</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">1. Willem Einthoven, (1901). "Un nouveau galvanomètre."</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">2. AD8232 Chip Instrumentation Datasheets, Analog Devices.</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">3. ESP32 Technical Manuals, Espressif Systems.</p>
+          </div>
+          
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <div style="font-size: 1.5rem; color: var(--color-accent); font-family: var(--font-header); font-weight: 700; margin-bottom: 0.5rem;">Smart ECG Monitor</div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">Ready for deployment, hardware testing, and clinical trial simulations.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Navigation Controls Footer -->
+  <footer>
+    <div class="slide-dots" id="dots-container">
+      <!-- Dots injected via javascript -->
+    </div>
+    <div class="nav-controls">
+      <button class="nav-btn" id="prev-btn" disabled>
+        <span>◀</span> Previous
+      </button>
+      <button class="nav-btn" id="next-btn">
+        Next <span>▶</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Slide Logic & Dynamic ECG Sweep Background Script -->
+  <script>
+    // Slideshow control
+    const slides = document.querySelectorAll('.slide');
+    const dotsContainer = document.getElementById('dots-container');
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const progressText = document.getElementById('progress-text');
+    let currentSlideIdx = 0;
+
+    // Create Navigation Dots
+    slides.forEach((slide, idx) => {
+      const dot = document.createElement('div');
+      dot.classList.add('dot');
+      if (idx === 0) dot.classList.add('active');
+      dot.addEventListener('click', () => goSlide(idx));
+      dotsContainer.appendChild(dot);
+    });
+
+    const dots = document.querySelectorAll('.dot');
+
+    function updateControls() {
+      prevBtn.disabled = currentSlideIdx === 0;
+      nextBtn.disabled = currentSlideIdx === slides.length - 1;
+      
+      // Update Slide dot states
+      dots.forEach((dot, idx) => {
+        dot.classList.toggle('active', idx === currentSlideIdx);
+      });
+      
+      // Update progress header text
+      const slideNumText = String(currentSlideIdx + 1).padStart(2, '0');
+      const totalNumText = String(slides.length).padStart(2, '0');
+      progressText.innerText = `SLIDE ${slideNumText} / ${totalNumText}`;
+    }
+
+    function goSlide(idx) {
+      if (idx < 0 || idx >= slides.length) return;
+      slides[currentSlideIdx].classList.remove('active');
+      currentSlideIdx = idx;
+      slides[currentSlideIdx].classList.add('active');
+      updateControls();
+    }
+
+    prevBtn.addEventListener('click', () => goSlide(currentSlideIdx - 1));
+    nextBtn.addEventListener('click', () => goSlide(currentSlideIdx + 1));
+
+    // Keyboard controls
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        goSlide(currentSlideIdx + 1);
+      } else if (e.key === 'ArrowLeft') {
+        goSlide(currentSlideIdx - 1);
+      }
+    });
+
+
+    // ==========================================
+    // GLOWING BACKGROUND ECG CANVAS RENDER ENGINE
+    // ==========================================
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ECG signal model equations (P-QRS-T mathematical generator)
+    let points = [];
+    const pointsCount = 400;
+    let t = 0;
+
+    function generateECGPoint(val) {
+      // Synthesize heart beat components based on phase
+      const phase = val % 100;
+      let amplitude = 0;
+      
+      if (phase >= 10 && phase < 18) {
+        // P Wave (Atrial depolarization)
+        const pPhase = (phase - 10) / 8;
+        amplitude = 0.15 * Math.sin(pPhase * Math.PI);
+      } else if (phase >= 25 && phase < 28) {
+        // Q Wave (Septal depolarization)
+        const qPhase = (phase - 25) / 3;
+        amplitude = -0.15 * qPhase;
+      } else if (phase >= 28 && phase < 32) {
+        // R Wave (Ventricular depolarization)
+        const rPhase = (phase - 28) / 4;
+        if (rPhase < 0.5) {
+          amplitude = -0.15 + 1.65 * (rPhase / 0.5);
+        } else {
+          amplitude = 1.5 - 1.7 * ((rPhase - 0.5) / 0.5);
+        }
+      } else if (phase >= 32 && phase < 35) {
+        // S Wave (Ventricular depolarization)
+        const sPhase = (phase - 32) / 3;
+        amplitude = -0.2 * (1.0 - sPhase);
+      } else if (phase >= 45 && phase < 58) {
+        // T Wave (Ventricular repolarization)
+        const tPhase = (phase - 45) / 13;
+        amplitude = 0.3 * Math.sin(tPhase * Math.PI);
+      } else {
+        // Baseline noise
+        amplitude = 0.01 * Math.sin(val * 2.0);
+      }
+      return amplitude;
+    }
+
+    // Initialize point buffer
+    for(let i=0; i<pointsCount; i++) {
+      points.push(0);
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Update data point buffer
+      points.shift();
+      points.push(generateECGPoint(t));
+      t += 0.5;
+
+      // Draw medical grid background on canvas (pink gridlines)
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.08)';
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Plot rolling ECG path
+      ctx.beginPath();
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      
+      // Dynamic glowing gradient line
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+      gradient.addColorStop(0, 'rgba(13, 148, 136, 0.2)');
+      gradient.addColorStop(0.8, 'rgba(13, 148, 136, 0.8)');
+      gradient.addColorStop(1, 'rgba(13, 148, 136, 1)');
+      ctx.strokeStyle = gradient;
+      
+      // Shadow glow
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = 'rgba(13, 148, 136, 0.45)';
+
+      const step = canvas.width / (pointsCount - 1);
+      const centerY = canvas.height * 0.75; // Lower screen placement
+      const scaleY = canvas.height * 0.12;
+
+      for (let i = 0; i < pointsCount; i++) {
+        const x = i * step;
+        const y = centerY - (points[i] * scaleY);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0; // reset shadow for next draw
+
+      requestAnimationFrame(animate);
+    }
+    animate();
+  </script>
+</body>
+</html>
