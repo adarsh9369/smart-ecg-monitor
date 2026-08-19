@@ -337,6 +337,66 @@ body {
   min-height: 480px;
 }
 
+/* Rotate Device Overlay */
+.rotate-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--bg-primary);
+  z-index: 99999;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  padding: 24px;
+}
+
+.rotate-content {
+  background: var(--card-bg);
+  border: 1px solid var(--color-cyan);
+  padding: 40px 24px;
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.3);
+  max-width: 400px;
+}
+
+.rotate-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--color-cyan);
+  margin-bottom: 20px;
+  animation: rotate-phone 2s infinite ease-in-out;
+}
+
+@keyframes rotate-phone {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-90deg); }
+  100% { transform: rotate(-90deg); }
+}
+
+.rotate-content h2 {
+  font-size: 1.5rem;
+  margin-bottom: 12px;
+  color: var(--text-main);
+}
+
+.rotate-content p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+@media screen and (max-width: 768px) and (orientation: portrait) {
+  .rotate-overlay {
+    display: flex;
+  }
+  .app-container, .glass-bg {
+    display: none !important;
+  }
+}
+
 .chart-legend {
   display: flex;
   gap: 16px;
