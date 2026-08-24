@@ -1116,14 +1116,19 @@ document.addEventListener('DOMContentLoaded', () => {
       btnRecord.style.borderColor = 'rgba(219, 39, 119, 0.6)';
       
       let elapsed = 0;
+      const targetSecs = document.getElementById('min-record-time') ? parseInt(document.getElementById('min-record-time').value) : 10;
+      
       recordingTimerId = setInterval(() => {
         elapsed++;
-        const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
-        const secs = (elapsed % 60).toString().padStart(2, '0');
-        recordText.textContent = `Stop (${mins}:${secs})`;
+        recordText.textContent = `Recording... (${elapsed}/${targetSecs}s)`;
+        
+        // Auto-stop when target duration is reached
+        if (elapsed >= targetSecs) {
+          toggleRecording();
+        }
       }, 1000);
       
-      logConsole('Session recording started.', 'success');
+      logConsole(`Session auto-recording started for ${targetSecs} seconds.`, 'success');
     } else {
       // Stop Recording
       isRecording = false;
@@ -1136,7 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
       
       logConsole(`Session recording stopped. Collected ${recordedSamples.length} samples.`, 'info');
       
-      if (recordedSamples.length >= 1500) {
+      if (recordedSamples.length > 50) {
         // downloadSessionCSV(); // Disabled automatic download per user request
         analyzeSessionData();
         
@@ -1147,9 +1152,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         reportModal.classList.add('active');
       } else {
-        const recordedSecs = (recordedSamples.length / 100).toFixed(1);
-        logConsole(`Error: Recording too short (${recordedSecs}s). Minimum 15 seconds required for a clinical report.`, 'error');
-        alert(`Recording too short! (${recordedSecs}s)\n\nPlease record for a minimum of 15 seconds to generate a diagnostic report.`);
+        logConsole(`Error: No samples collected.`, 'error');
+        alert(`Recording failed! No data collected.`);
       }
     }
   }
