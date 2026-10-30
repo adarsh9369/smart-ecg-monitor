@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_blue">#0284C7</color>
+    <color name="primary_dark_blue">#0369A1</color>
+    <color name="secondary_teal">#0D9488</color>
+    <color name="medical_green">#10B981</color>
+    <color name="alert_red">#EF4444</color>
+    <color name="warning_amber">#F59E0B</color>
+    <color name="light_bg">#F8FAFC</color>
+    <color name="light_surface">#FFFFFF</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_muted">#64748B</color>
+    <color name="border_light">#E2E8F0</color>
+</resources>
+

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="alert_red">#EF4444</color>
+    <color name="border_light">#E2E8F0</color>
+    <color name="light_bg">#F8FAFC</color>
+    <color name="light_surface">#FFFFFF</color>
+    <color name="medical_green">#10B981</color>
+    <color name="primary_blue">#0284C7</color>
+    <color name="primary_dark_blue">#0369A1</color>
+    <color name="secondary_teal">#0D9488</color>
+    <color name="text_muted">#64748B</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="warning_amber">#F59E0B</color>
+    <string name="app_name">Smart Vital Monitor</string>
+    <string name="college_header">Presented by HITM, Lucknow</string>
+    <style name="Theme.SmartVitalMonitor" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#0284C7</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#F8FAFC</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
