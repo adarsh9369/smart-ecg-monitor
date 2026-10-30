@@ -1,52 +1,106 @@
-float H_th_e = 1;
-float L_th_e = -1;
-const int buff_size_th_e = 300;
-float array_th_e[buff_size_th_e];
-int m_e = 0;
-int p_e = 0, heart_rate;
-bool val_e;
-int pr_e;
-float sum_e;
-unsigned long t_pr_e = 0;
-const int arry_size_e = 300;
-float array_pulse_e[arry_size_e];
+#ifndef PULSE_CAL_H_
+#define PULSE_CAL_H_
 
-void hr_calculation(float filter_pulse_e)  // filter
-{
-  array_th_e[m_e] = filter_pulse_e;
-  m_e = m_e + 1;
-  if (m_e >= buff_size_th_e) {
-    m_e = 0;
-    H_th_e = 0;
-    for (int i = 0; i < buff_size_th_e; ++i) {
-      H_th_e = max(H_th_e, array_th_e[i]);
-    }
-    H_th_e = H_th_e - (H_th_e * 0.2);
-  }
+#include <Arduino.h>
 
-  //  L_th = -(H_th - 10); // Low level trigger point
-  L_th_e = H_th_e * 0.33;
-  if (filter_pulse_e > H_th_e && val_e == 0) {
-    pr_e = 60000 / (millis() - t_pr_e);
-    val_e = 1;
-    t_pr_e = millis();
-  }
+// =====================================================
+// ADAPTIVE R-PEAK & HEART RATE DETECTOR
+// =====================================================
 
-  else if (filter_pulse_e < L_th_e && val_e == 1) {
-    val_e = 0;
-  }
-  sum_e = sum_e - array_pulse_e[p_e];
-  array_pulse_e[p_e] = pr_e;
-  sum_e = sum_e + array_pulse_e[p_e];
-  heart_rate = (sum_e / arry_size_e);
+// Adaptive detection thresholds
+static float adaptive_threshold = 25.0f;
+static float peak_max = 0.0f;
+static bool peak_detecting = false;
+static unsigned long last_beat_time = 0;
+static const unsigned long REFRACTORY_PERIOD_MS = 250; // Max human HR = 240 BPM (250ms)
 
-  if ((heart_rate > 5) && (heart_rate < 300)) {
-    heart_rate = heart_rate+1;
-  } else {
+// Circular buffer of the last 5 heartbeats for immediate, stable averaging
+static const int BEAT_HISTORY_SIZE = 5;
+static int beat_history[BEAT_HISTORY_SIZE];
+static int beat_count = 0;
+static int beat_index = 0;
+
+int heart_rate = 0;
+
+inline void hr_calculation(float filter_pulse_e) {
+  unsigned long now = millis();
+
+  // If no beat detected for > 3.5 seconds (flatline or electrode removed), reset HR to 0
+  if (last_beat_time > 0 && (now - last_beat_time > 3500)) {
     heart_rate = 0;
+    beat_count = 0;
+    adaptive_threshold = 25.0f;
   }
-  p_e = p_e + 1;
-  if (p_e >= arry_size_e) {
-    p_e = 0;
+
+  // Refractory lockout: ignore T-waves or noise within 250ms of the last R-peak
+  if (now - last_beat_time < REFRACTORY_PERIOD_MS) {
+    return;
+  }
+
+  // Detect rising edge crossing adaptive threshold
+  if (!peak_detecting && (filter_pulse_e > adaptive_threshold)) {
+    peak_detecting = true;
+    peak_max = filter_pulse_e;
+  }
+  // While above threshold, track the maximum crest of the R-wave
+  else if (peak_detecting) {
+    if (filter_pulse_e > peak_max) {
+      peak_max = filter_pulse_e;
+    }
+    // When signal drops below 60% of crest or 80% of threshold, R-peak is confirmed!
+    else if (filter_pulse_e < (peak_max * 0.60f) || filter_pulse_e < (adaptive_threshold * 0.80f)) {
+      peak_detecting = false;
+
+      if (last_beat_time > 0) {
+        unsigned long rr_interval = now - last_beat_time;
+
+        // Valid physiological human RR interval: 300ms (200 BPM) to 1500ms (40 BPM)
+        if (rr_interval >= 300 && rr_interval <= 1500) {
+          int instant_bpm = (int)(60000UL / rr_interval);
+
+          // Store in circular buffer of actual heartbeats
+          beat_history[beat_index] = instant_bpm;
+          beat_index = (beat_index + 1) % BEAT_HISTORY_SIZE;
+          if (beat_count < BEAT_HISTORY_SIZE) {
+            beat_count++;
+          }
+
+          // Calculate moving average across recent heartbeats
+          long sum_beats = 0;
+          for (int i = 0; i < beat_count; i++) {
+            sum_beats += beat_history[i];
+          }
+          heart_rate = (int)(sum_beats / beat_count);
+
+          // Dynamically adjust threshold to 55% of this confirmed peak
+          adaptive_threshold = peak_max * 0.55f;
+          if (adaptive_threshold < 15.0f) adaptive_threshold = 15.0f;
+          if (adaptive_threshold > 250.0f) adaptive_threshold = 250.0f;
+        }
+      }
+
+      last_beat_time = now;
+    }
+  }
+
+  // Gentle decay of threshold if ECG amplitude decreases
+  static unsigned long last_decay_time = 0;
+  if (now - last_decay_time >= 100) {
+    last_decay_time = now;
+    if (!peak_detecting && adaptive_threshold > 18.0f) {
+      adaptive_threshold *= 0.99f;
+    }
   }
 }
+
+inline void resetPulseCal() {
+  adaptive_threshold = 25.0f;
+  peak_max = 0.0f;
+  peak_detecting = false;
+  last_beat_time = 0;
+  beat_count = 0;
+  beat_index = 0;
+  heart_rate = 0;
+}
+
+#endif // PULSE_CAL_H_
