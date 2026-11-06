@@ -1,0 +1,22 @@
+R_DEF: Internal format may change without notice
+local
+color alert_red
+color border_light
+color light_bg
+color light_surface
+color medical_green
+color primary_blue
+color primary_dark_blue
+color secondary_teal
+color text_muted
+color text_primary
+color warning_amber
+drawable ic_app_logo
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+string app_name
+string college_header
+style Theme.SmartVitalMonitor
+xml backup_rules
+xml data_extraction_rules
+xml file_paths
