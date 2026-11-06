@@ -17,7 +17,7 @@
 // =====================================================
 // PIN CONFIGURATION
 // =====================================================
-// ECG signal pin: GPIO 15
+// ECG signal pin: GPIO 34 (ADC1 - dedicated analog input, works seamlessly with BLE)
 constexpr int ECG_PIN = 15;
 constexpr int LO_PLUS_PIN = 33;
 constexpr int LO_MINUS_PIN = 32;
@@ -88,6 +88,22 @@ float smoothMax = 2148.0f;
 bool autoscaleResetNeeded = true;
 
 // =====================================================
+// BLE SAMPLE FIFO (Matches App speed exactly to 100 Hz OLED)
+// =====================================================
+#define BLE_QUEUE_SIZE 128
+float bleQueue[BLE_QUEUE_SIZE];
+volatile int bleQueueHead = 0;
+volatile int bleQueueTail = 0;
+
+void queueBleEcg(float val) {
+  int next = (bleQueueHead + 1) % BLE_QUEUE_SIZE;
+  if (next != bleQueueTail) {
+    bleQueue[bleQueueHead] = val;
+    bleQueueHead = next;
+  }
+}
+
+// =====================================================
 // MAX30105 SpO2 SENSOR
 // =====================================================
 Bonezegei_Max30105 pbx;
@@ -131,6 +147,41 @@ void updateLeadStatus() {
     leadOffStartTime = 0;
     leadOffConfirmed = false;
   }
+}
+
+// =====================================================
+// COMMON-CATHODE RGB LED INDICATORS (Non-blocking)
+// =====================================================
+void updateLEDs() {
+  static unsigned long lastBlinkTime = 0;
+  static bool blinkState = false;
+  unsigned long now = millis();
+
+  if (now - lastBlinkTime >= 500) {
+    lastBlinkTime = now;
+    blinkState = !blinkState;
+  }
+
+  // Priority 1: ECG Lead-Off Alert (Red LED blinks at 1 Hz, Blue strictly OFF)
+  if (leadOffConfirmed) {
+    digitalWrite(RED_PIN, blinkState ? HIGH : LOW);
+    digitalWrite(GREEN_PIN, LOW);
+    digitalWrite(BLUE_PIN, LOW);
+    return;
+  }
+
+  // Priority 2: BLE Disconnected (Blue LED blinks at 1 Hz)
+  if (!deviceConnected) {
+    digitalWrite(RED_PIN, LOW);
+    digitalWrite(GREEN_PIN, LOW);
+    digitalWrite(BLUE_PIN, blinkState ? HIGH : LOW);
+    return;
+  }
+
+  // Priority 3: BLE Connected & Normal Monitoring (Solid Green)
+  digitalWrite(RED_PIN, LOW);
+  digitalWrite(GREEN_PIN, HIGH);
+  digitalWrite(BLUE_PIN, LOW);
 }
 
 void resetBPM() {
@@ -205,19 +256,37 @@ void updateTemperature() {
 }
 
 // =====================================================
-// BLE DATA TRANSMISSION
-// Streamlined JSON fits cleanly within negotiated MTU
+// BLE DATA TRANSMISSION (Transmits full 100 Hz stream)
 // =====================================================
-void sendBLEData(float ecgValue, float heartRate, bool leadOff, bool demo) {
+void flushBleQueue() {
   if (!deviceConnected || pCharacteristic == nullptr) {
+    bleQueueTail = bleQueueHead; // Drain queue when disconnected
     return;
   }
 
-  char json[160];
+  // Pull accumulated samples from queue (up to 5 samples per batch)
+  float batch[8];
+  int count = 0;
+  while (bleQueueTail != bleQueueHead && count < 5) {
+    batch[count++] = bleQueue[bleQueueTail];
+    bleQueueTail = (bleQueueTail + 1) % BLE_QUEUE_SIZE;
+  }
+
+  if (count == 0) return;
+
+  char json[240];
+  char ecgBatchStr[90] = "[";
+  for (int i = 0; i < count; i++) {
+    char num[16];
+    snprintf(num, sizeof(num), i == 0 ? "%.1f" : ",%.1f", batch[i]);
+    strcat(ecgBatchStr, num);
+  }
+  strcat(ecgBatchStr, "]");
+
   char spo2Text[12];
   char tempText[12];
 
-  // Only send real sensor readings — never send demo values during live patient sessions!
+  // Strictly real sensor readings only — never forge demo values during live sessions!
   if (fingerDetected && spo2Value >= 70.0f && spo2Value <= 100.0f) {
     snprintf(spo2Text, sizeof(spo2Text), "%.1f", spo2Value);
   } else {
@@ -230,17 +299,23 @@ void sendBLEData(float ecgValue, float heartRate, bool leadOff, bool demo) {
     strcpy(tempText, "null");
   }
 
+  char bpmText[12];
+  if (!leadOffConfirmed && bpm >= 35.0f && bpm <= 220.0f) {
+    snprintf(bpmText, sizeof(bpmText), "%.0f", bpm);
+  } else {
+    strcpy(bpmText, "null");
+  }
+
   snprintf(
     json,
     sizeof(json),
-    "{\"ecg\":%.1f,\"bpm\":%.0f,\"spo2\":%s,\"temp\":%s,\"leadOff\":%d,\"demo\":%d,\"sensorDemo\":%d}",
-    ecgValue,
-    heartRate,
+    "{\"ecg\":%.1f,\"ecgs\":%s,\"bpm\":%s,\"spo2\":%s,\"temp\":%s,\"leadOff\":%d,\"demo\":0,\"sensorDemo\":0}",
+    batch[count - 1],
+    ecgBatchStr,
+    bpmText,
     spo2Text,
     tempText,
-    leadOff ? 1 : 0,
-    demo ? 1 : 0,
-    fingerDetected ? 0 : 1
+    leadOffConfirmed ? 1 : 0
   );
 
   pCharacteristic->setValue((uint8_t*)json, strlen(json));
@@ -254,26 +329,10 @@ void sampleAndProcessECG() {
   updateLeadStatus();
 
   if (leadOffConfirmed) {
-    // Continuous P-QRS-T mathematical simulation
-    static int demo_counter = 0;
-    float phase = (demo_counter % 100) / 100.0f;
-    float val = 0.0f;
-
-    if (phase >= 0.12f && phase <= 0.22f) {
-      val = 1.8f * sinf(((phase - 0.12f) / 0.10f) * PI);
-    } else if (phase >= 0.27f && phase <= 0.29f) {
-      val = -2.0f * sinf(((phase - 0.27f) / 0.02f) * PI);
-    } else if (phase >= 0.29f && phase <= 0.32f) {
-      val = 22.0f * sinf(((phase - 0.29f) / 0.03f) * PI);
-    } else if (phase >= 0.32f && phase <= 0.35f) {
-      val = -5.5f * sinf(((phase - 0.32f) / 0.03f) * PI);
-    } else if (phase >= 0.45f && phase <= 0.60f) {
-      val = 4.5f * sinf(((phase - 0.45f) / 0.15f) * PI);
-    }
-
-    float fake_val = 2048.0f + (val * 30.0f);
-    displayECG = fake_val;
-    bpm = 60.0f;
+    // Leads disconnected: Maintain flat baseline (2048), DO NOT synthesize fake ECG during live mode
+    displayECG = 2048.0f;
+    bpm = 0.0f;
+    previousLeadOff = true;
 
     ecgBuffer[bufferIndex] = displayECG;
     bufferIndex++;
@@ -281,8 +340,9 @@ void sampleAndProcessECG() {
       bufferIndex = 0;
       bufferFilled = true;
     }
-    demo_counter++;
-    previousLeadOff = true;
+
+    // Push flatline baseline sample to BLE queue
+    queueBleEcg(displayECG);
 
   } else {
     if (previousLeadOff) {
@@ -293,11 +353,11 @@ void sampleAndProcessECG() {
     int raw = analogRead(ECG_PIN);
     float filtered = filterECG(raw);
 
-    // Calculate BPM with 0-centered filtered signal (required by pulse_cal algorithm)
+    // Calculate BPM with 0-centered filtered signal
     hr_calculation(filtered);
     bpm = hr_avg(heart_rate);
 
-    // Center display signal around 2048 for unified, glitch-free baseline
+    // Center display signal around 2048 for unified baseline
     displayECG = 2048.0f + filtered;
 
     ecgBuffer[bufferIndex] = displayECG;
@@ -306,6 +366,9 @@ void sampleAndProcessECG() {
       bufferIndex = 0;
       bufferFilled = true;
     }
+
+    // Push live sample to BLE queue
+    queueBleEcg(displayECG);
   }
 }
 
@@ -321,40 +384,46 @@ void ecgSamplingTask(void* pvParameters) {
 }
 
 // =====================================================
-// OLED DISPLAY ENGINE
-// ECG Waveform: Y=14..48 (35 pixels tall)
-// Footer: SpO2 (left) and Temperature (right) on Y=52..64
+// OLED DISPLAY ENGINE (128x64 SH1106 Medical Layout)
+// - Top Bar (Y: 0..11): College, Mode Badge & BLE Status
+// - ECG Trace (Y: 12..49): 38px High Peak-Preserving Waveform
+// - Bottom Vitals Dock (Y: 51..64): 3 Balanced Columns (HR | SpO2 | Temp)
+// - Battery Icon Removed per specification
 // =====================================================
 void drawMovingECG() {
   oled.clearBuffer();
   oled.setDrawColor(1);
 
-  // --- HEADER (Y: 0..12) ---
-  oled.setFont(u8g2_font_6x10_tf);
-  oled.drawStr(2, 9, "ECG:");
+  // 1. TOP STATUS BAR (Y: 0..11)
+  oled.setFont(u8g2_font_5x8_tf);
+  oled.drawStr(2, 9, "HITM LKO");
 
   if (leadOffConfirmed) {
-    oled.drawStr(28, 9, "60");
-    oled.drawStr(66, 9, "DEMO");
+    // Inverted high-visibility alert box for lead-off warning
+    oled.drawRBox(46, 1, 48, 9, 2);
+    oled.setDrawColor(0);
+    oled.setFont(u8g2_font_5x7_tf);
+    oled.drawStr(49, 8, "!LEAD OFF!");
+    oled.setDrawColor(1);
   } else {
-    if (bpm >= 40 && bpm <= 220) {
-      char bpmText[8];
-      snprintf(bpmText, sizeof(bpmText), "%.0f", bpm);
-      oled.drawStr(28, 9, bpmText);
-    } else {
-      oled.drawStr(28, 9, "--");
-    }
-    oled.drawStr(66, 9, "LIVE");
+    oled.setFont(u8g2_font_5x7_tf);
+    oled.drawStr(52, 8, deviceConnected ? "[LIVE]" : "[DEMO]");
   }
 
-  // Decorative battery icon (top right)
-  oled.drawFrame(108, 2, 15, 7);
-  oled.drawBox(123, 4, 2, 3);
-  oled.drawBox(110, 4, 9, 3);
+  // BLE Connection Status Indicator (Solid dot = connected, hollow = disconnected)
+  oled.setFont(u8g2_font_5x7_tf);
+  if (deviceConnected) {
+    oled.drawDisc(106, 5, 2);
+    oled.drawStr(111, 8, "BLE");
+  } else {
+    oled.drawCircle(106, 5, 2);
+    oled.drawStr(111, 8, "BLE");
+  }
 
-  oled.drawHLine(0, 12, 128);
+  // Top Separator Line
+  oled.drawHLine(0, 11, 128);
 
-  // --- ECG GRAPH (Y: 14..48 -> 35 pixels height) ---
+  // 2. ECG WAVEFORM AREA (Y: 12..49 -> 38 Pixels Height!)
   int count = bufferFilled ? TOTAL_SAMPLES : bufferIndex;
 
   if (count >= 2) {
@@ -395,7 +464,11 @@ void drawMovingECG() {
       maxValue = smoothMax;
     }
 
-    // Peak-preserving connected waveform rendering
+    // Lead identifier in top-left corner of ECG area
+    oled.setFont(u8g2_font_4x6_tf);
+    oled.drawStr(2, 18, "II");
+
+    // Peak-preserving connected waveform rendering across Y: 13 to 49
     int lastY = -1;
     for (int x = 0; x < 128; x++) {
       int sampleStart = (x * count) / 128;
@@ -418,11 +491,11 @@ void drawMovingECG() {
         if (i == sampleEnd - 1) lastVal = val;
       }
 
-      // Map vertically: 48 (bottom) to 14 (top)
-      int yMin = constrain(map((int)localMin, (int)minValue, (int)maxValue, 48, 14), 14, 48);
-      int yMax = constrain(map((int)localMax, (int)minValue, (int)maxValue, 48, 14), 14, 48);
-      int yStart = constrain(map((int)firstVal, (int)minValue, (int)maxValue, 48, 14), 14, 48);
-      int yEnd = constrain(map((int)lastVal, (int)minValue, (int)maxValue, 48, 14), 14, 48);
+      // Map vertically: 49 (bottom) to 13 (top)
+      int yMin = constrain(map((int)localMin, (int)minValue, (int)maxValue, 49, 13), 13, 49);
+      int yMax = constrain(map((int)localMax, (int)minValue, (int)maxValue, 49, 13), 13, 49);
+      int yStart = constrain(map((int)firstVal, (int)minValue, (int)maxValue, 49, 13), 13, 49);
+      int yEnd = constrain(map((int)lastVal, (int)minValue, (int)maxValue, 49, 13), 13, 49);
 
       if (yMin != yMax) {
         oled.drawLine(x, yMin, x, yMax);
@@ -438,27 +511,41 @@ void drawMovingECG() {
     }
   }
 
-  // --- SEPARATOR & BOTTOM VITALS (Y: 50..64) ---
+  // 3. BOTTOM VITALS DOCK (Y: 50..64)
   oled.drawHLine(0, 50, 128);
-  oled.setFont(u8g2_font_6x10_tf);
 
-  // SpO2 (Left) — show real readings only
-  char spo2Text[16];
-  if (fingerDetected && spo2Value >= 70.0f && spo2Value <= 100.0f) {
-    snprintf(spo2Text, sizeof(spo2Text), "SpO2:%.0f%%", spo2Value);
+  // Vertical column dividers
+  oled.drawVLine(42, 51, 13);
+  oled.drawVLine(85, 51, 13);
+
+  oled.setFont(u8g2_font_5x8_tf);
+
+  // Column 1: Heart Rate (x: 2..40)
+  char hrText[12];
+  if (!leadOffConfirmed && bpm >= 35.0f && bpm <= 220.0f) {
+    snprintf(hrText, sizeof(hrText), "HR:%.0f", bpm);
   } else {
-    strcpy(spo2Text, "SpO2:--");
+    strcpy(hrText, "HR:N/A");
   }
-  oled.drawStr(2, 62, spo2Text);
+  oled.drawStr(3, 61, hrText);
 
-  // Temperature (Right) — show real readings only
-  char tempText[16];
+  // Column 2: SpO2 Blood Oxygen (x: 45..83)
+  char spo2Text[12];
+  if (fingerDetected && spo2Value >= 70.0f && spo2Value <= 100.0f) {
+    snprintf(spo2Text, sizeof(spo2Text), "O2:%.0f%%", spo2Value);
+  } else {
+    strcpy(spo2Text, "O2:N/A");
+  }
+  oled.drawStr(46, 61, spo2Text);
+
+  // Column 3: Temperature (x: 88..126)
+  char tempText[12];
   if (!isnan(temperatureC) && temperatureC >= 20.0f && temperatureC <= 50.0f) {
     snprintf(tempText, sizeof(tempText), "T:%.1fC", temperatureC);
   } else {
-    strcpy(tempText, "T:--");
+    strcpy(tempText, "T:N/A");
   }
-  oled.drawStr(70, 62, tempText);
+  oled.drawStr(88, 61, tempText);
 
   oled.sendBuffer();
 }
@@ -469,7 +556,7 @@ void drawMovingECG() {
 void setup() {
   Serial.begin(115200);
 
-  // ADC Configuration (Pin 15)
+  // ADC Configuration (Pin 34)
   pinMode(ECG_PIN, INPUT);
   analogReadResolution(12);
   analogSetPinAttenuation(ECG_PIN, ADC_11db);
@@ -529,6 +616,7 @@ void setup() {
   max30105Ready = true;
 
   // DS18B20
+  pinMode(TEMP_PIN, INPUT_PULLUP);
   tempSensor.begin();
   tempSensor.setWaitForConversion(false);
   tempSensorReady = (tempSensor.getDeviceCount() > 0);
@@ -554,32 +642,34 @@ void setup() {
   );
 
   Serial.println("SMART VITAL MONITOR READY");
-  Serial.println("ECG Task: 100Hz on Core 1 (Pin 15)");
+  Serial.println("ECG Task: 100Hz on Core 1 (Pin 34)");
 }
 
 // =====================================================
-// MAIN LOOP (UI, BLE, and Sensor Tasks on Core 0)
+// MAIN LOOP (UI, BLE, Sensor Tasks & LEDs on Core 0)
 // =====================================================
 void loop() {
   static unsigned long lastDisplay = 0;
   static unsigned long lastBLE = 0;
 
-  // 1. SpO2 Sensor (every 250 ms)
+  // 1. Update Common-Cathode RGB LED States
+  updateLEDs();
+
+  // 2. SpO2 Sensor (every 250 ms)
   updateSpO2Sensor();
 
-  // 2. Temperature Sensor (every 1000 ms non-blocking)
+  // 3. Temperature Sensor (every 1000 ms non-blocking)
   if (tempSensorReady) {
     updateTemperature();
   }
 
-  // 3. BLE Notification (clean 50 Hz rate)
-  if (millis() - lastBLE >= 20) {
+  // 4. BLE Notification (transmits all accumulated 100 Hz samples every 35 ms)
+  if (millis() - lastBLE >= 35) {
     lastBLE = millis();
-    sendBLEData(displayECG, bpm, leadOffConfirmed, leadOffConfirmed);
-    Serial.println(displayECG);
+    flushBleQueue();
   }
 
-  // 4. OLED Display (20 FPS / every 50 ms)
+  // 5. OLED Display (20 FPS / every 50 ms)
   if (millis() - lastDisplay >= 50) {
     lastDisplay = millis();
     drawMovingECG();
