@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.example.smartvitalmonitor.app-debug-48:/xml_file_paths.xml.flat",
+        "source": "com.example.smartvitalmonitor.app-main-50:/xml/file_paths.xml"
+    },
+    {
+        "merged": "com.example.smartvitalmonitor.app-debug-48:/drawable_ic_app_logo.xml.flat",
+        "source": "com.example.smartvitalmonitor.app-main-50:/drawable/ic_app_logo.xml"
+    },
+    {
+        "merged": "com.example.smartvitalmonitor.app-debug-48:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.example.smartvitalmonitor.app-main-50:/drawable/ic_launcher_background.xml"
+    },
+    {
+        "merged": "com.example.smartvitalmonitor.app-debug-48:/xml_data_extraction_rules.xml.flat",
+        "source": "com.example.smartvitalmonitor.app-main-50:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.example.smartvitalmonitor.app-debug-48:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.example.smartvitalmonitor.app-main-50:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.example.smartvitalmonitor.app-debug-48:/xml_backup_rules.xml.flat",
+        "source": "com.example.smartvitalmonitor.app-main-50:/xml/backup_rules.xml"
+    }
+]
